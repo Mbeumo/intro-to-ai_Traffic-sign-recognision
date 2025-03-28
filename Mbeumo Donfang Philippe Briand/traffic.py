@@ -3,10 +3,9 @@ import numpy as np
 import os
 import sys
 import tensorflow as tf
-
 from sklearn.model_selection import train_test_split
 
-EPOCHS = 10
+EPOCHS = 30
 IMG_WIDTH = 30
 IMG_HEIGHT = 30
 NUM_CATEGORIES = 43
@@ -58,7 +57,34 @@ def load_data(data_dir):
     be a list of integer labels, representing the categories for each of the
     corresponding `images`.
     """
-    raise NotImplementedError
+    images = []
+    labels = []
+
+    # Iterate over category directories
+    for category in range(NUM_CATEGORIES):
+        category_path = os.path.join(data_dir, str(category))  # Path to category folder
+        
+        # Check if category directory exists
+        if not os.path.isdir(category_path):
+            continue  # Skip missing categories
+
+        # Iterate over image files in the category directory
+        for file_name in os.listdir(category_path):
+            file_path = os.path.join(category_path, file_name)
+
+            # Read the image using OpenCV
+            image = cv2.imread(file_path)
+            if image is None:
+                continue  # Skip unreadable files
+
+            # Resize the image to standard dimensions
+            image = cv2.resize(image, (IMG_WIDTH, IMG_HEIGHT))
+
+            # Append to lists
+            images.append(image)
+            labels.append(category)
+
+    return images, labels
 
 
 def get_model():
@@ -67,7 +93,7 @@ def get_model():
     `input_shape` of the first layer is `(IMG_WIDTH, IMG_HEIGHT, 3)`.
     The output layer should have `NUM_CATEGORIES` units, one for each category.
     """
-    raise NotImplementedError
+
 
 
 if __name__ == "__main__":
