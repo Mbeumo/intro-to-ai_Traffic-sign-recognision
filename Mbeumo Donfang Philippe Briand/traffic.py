@@ -3,6 +3,10 @@ import numpy as np
 import os
 import sys
 import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 
 EPOCHS = 30
@@ -93,7 +97,45 @@ def get_model():
     `input_shape` of the first layer is `(IMG_WIDTH, IMG_HEIGHT, 3)`.
     The output layer should have `NUM_CATEGORIES` units, one for each category.
     """
+    model = Sequential([
+        # Convolutional layer 1
+        Conv2D(32, (3, 3), activation="relu", padding="same", input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)),
+        BatchNormalization(),
+        MaxPooling2D(pool_size=(2, 2)),
+        
+        # Convolutional layer 2
+        Conv2D(64, (3, 3), activation="relu", padding="same"),
+        BatchNormalization(),
+        MaxPooling2D(pool_size=(2, 2)),
 
+        # Convolutional layer 3
+        Conv2D(128, (3, 3), activation="relu", padding="same"),
+        BatchNormalization(),
+        MaxPooling2D(pool_size=(2, 2)),
+
+        # Flatten to 1D
+        Flatten(),
+
+        # Fully connected layer
+        Dense(256, activation="relu", kernel_regularizer=l2(0.001)),
+        Dropout(0.5),  # Prevent overfitting
+
+        # Fully connected layer
+        Dense(128, activation="relu", kernel_regularizer=l2(0.001)),
+        Dropout(0.3),
+
+        # Output layer (softmax for multi-class classification)
+        Dense(NUM_CATEGORIES, activation="softmax")
+    ])
+
+    # Compile model
+    model.compile(
+        optimizer=Adam(learning_rate=0.0005),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    return model
 
 
 if __name__ == "__main__":
