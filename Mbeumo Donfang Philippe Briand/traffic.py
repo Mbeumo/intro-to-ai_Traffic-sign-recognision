@@ -8,12 +8,14 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropou
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 
 EPOCHS = 30
 IMG_WIDTH = 30
 IMG_HEIGHT = 30
 NUM_CATEGORIES = 43
-TEST_SIZE = 0.4
+TEST_SIZE = 0.2
 
 
 def main():
@@ -31,11 +33,24 @@ def main():
         np.array(images), np.array(labels), test_size=TEST_SIZE
     )
 
+    datagen = ImageDataGenerator(
+        rotation_range=15, 
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        shear_range=0.1,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        fill_mode="nearest"
+    )
+
+    # Fit data augmentation only on training set
+    datagen.fit(x_train)
+
     # Get a compiled neural network
     model = get_model()
 
     # Fit model on training data
-    model.fit(x_train, y_train, epochs=EPOCHS)
+    model.fit(datagen.flow(x_train, y_train, batch_size=32), epochs=EPOCHS, validation_data=(x_test, y_test))
 
     # Evaluate neural network performance
     model.evaluate(x_test,  y_test, verbose=2)
@@ -82,7 +97,8 @@ def load_data(data_dir):
                 continue  # Skip unreadable files
 
             # Resize the image to standard dimensions
-            image = cv2.resize(image, (IMG_WIDTH, IMG_HEIGHT))
+            imageL = cv2.resize(image, (IMG_WIDTH, IMG_HEIGHT))
+	    image = imageL / 255.0  # Normalize to [0, 1]
 
             # Append to lists
             images.append(image)
