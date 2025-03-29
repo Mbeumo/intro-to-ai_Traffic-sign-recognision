@@ -9,6 +9,10 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Input
+
 
 
 EPOCHS = 30
@@ -26,7 +30,7 @@ def main():
 
     # Get image arrays and labels for all image files
     images, labels = load_data(sys.argv[1])
-
+    
     # Split data into training and testing sets
     labels = tf.keras.utils.to_categorical(labels)
     x_train, x_test, y_train, y_test = train_test_split(
@@ -34,26 +38,42 @@ def main():
     )
 
     datagen = ImageDataGenerator(
-        rotation_range=15, 
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        shear_range=0.1,
-        zoom_range=0.2,
+        shear_range=0.05,  # Reduced shear
+        zoom_range=0.1,    # Reduced zoom
         horizontal_flip=True,
+        brightness_range=[0.8, 1.2],  # Slightly reduced brightness variation
+        channel_shift_range=0.05,     # Reduced channel shift
         fill_mode="nearest"
     )
 
     # Fit data augmentation only on training set
-    datagen.fit(x_train)
+    #datagen.fit(x_train)
 
     # Get a compiled neural network
     model = get_model()
-
+    lr_scheduler = ReduceLROnPlateau(
+        monitor="val_loss",
+        factor=0.5,
+        patience=5,
+        verbose=1
+    )
+    early_stopping = EarlyStopping(
+        monitor="val_loss",  # Monitor validation loss
+        patience=5,          # Stop if no improvement after 5 epochs
+        restore_best_weights=True,  # Restore the best weights
+        verbose=1
+    )
     # Fit model on training data
-    model.fit(datagen.flow(x_train, y_train, batch_size=32), epochs=EPOCHS, validation_data=(x_test, y_test))
+    model.fit(x_train, y_train, 
+        batch_size=32, epochs=EPOCHS, 
+        validation_data=(x_test, y_test),  # Pass the learning rate scheduler here
+        callbacks=[lr_scheduler, early_stopping]  # Use both callbacks
 
+    )
+
+    print(model.summary())
     # Evaluate neural network performance
-    model.evaluate(x_test,  y_test, verbose=2)
+    print(model.evaluate(x_test,  y_test, verbose=2))
 
     # Save model to file
     if len(sys.argv) == 3:
@@ -94,11 +114,13 @@ def load_data(data_dir):
             # Read the image using OpenCV
             image = cv2.imread(file_path)
             if image is None:
+                print(f"Warning: Unable to read file {file_path}. Skipping.")
+
                 continue  # Skip unreadable files
 
             # Resize the image to standard dimensions
             imageL = cv2.resize(image, (IMG_WIDTH, IMG_HEIGHT))
-	    image = imageL / 255.0  # Normalize to [0, 1]
+            image = imageL / 255.0  # Normalize to [0, 1]
 
             # Append to lists
             images.append(image)
@@ -114,39 +136,44 @@ def get_model():
     The output layer should have `NUM_CATEGORIES` units, one for each category.
     """
     model = Sequential([
+        Input(shape=(IMG_WIDTH, IMG_HEIGHT, 3)),  # Explicit Input layer
+
         # Convolutional layer 1
-        Conv2D(32, (3, 3), activation="relu", padding="same", input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)),
-        BatchNormalization(),
-        MaxPooling2D(pool_size=(2, 2)),
-        
-        # Convolutional layer 2
         Conv2D(64, (3, 3), activation="relu", padding="same"),
         BatchNormalization(),
         MaxPooling2D(pool_size=(2, 2)),
+        Dropout(0.25),
 
-        # Convolutional layer 3
+        # Convolutional layer 2
         Conv2D(128, (3, 3), activation="relu", padding="same"),
         BatchNormalization(),
         MaxPooling2D(pool_size=(2, 2)),
+        Dropout(0.25),
 
-        # Flatten to 1D
+        # Convolutional layer 3
+        Conv2D(256, (3, 3), activation="relu", padding="same"),
+        BatchNormalization(),
+        MaxPooling2D(pool_size=(2, 2)),
+        Dropout(0.3),
+
+        # Flatten
         Flatten(),
 
         # Fully connected layer
-        Dense(256, activation="relu", kernel_regularizer=l2(0.001)),
-        Dropout(0.5),  # Prevent overfitting
+        Dense(512, activation="relu", kernel_regularizer=l2(0.001)),
+        Dropout(0.5),
 
         # Fully connected layer
-        Dense(128, activation="relu", kernel_regularizer=l2(0.001)),
-        Dropout(0.3),
+        Dense(256, activation="relu", kernel_regularizer=l2(0.001)),
+        Dropout(0.4),
 
-        # Output layer (softmax for multi-class classification)
+        # Output layer
         Dense(NUM_CATEGORIES, activation="softmax")
     ])
-
+    
     # Compile model
     model.compile(
-        optimizer=Adam(learning_rate=0.0005),
+        optimizer=Adam(learning_rate=0.0003),
         loss="categorical_crossentropy",
         metrics=["accuracy"]
     )
