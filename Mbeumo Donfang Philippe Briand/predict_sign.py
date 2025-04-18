@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import csv
-#import pygame
 from tensorflow.keras.models import load_model
-from tkinter import Tk, filedialog, Label, Button, Canvas, PhotoImage
+from tkinter import Tk, filedialog, Label, Button, Canvas, PhotoImage, StringVar
+from PIL import Image, ImageTk  # Import Pillow for image handling
 
 # Constants
 IMG_WIDTH = 30
@@ -34,9 +34,11 @@ def get_categories_from_file(labels_file):
         for row in reader:
             categories.append(row[1])  # Assuming the second column contains category names
     return categories
+
 CATEGORIES = get_categories_from_file("labels.csv")  # Replace with actual category names if available
 
 def predict_image(image_path):
+    """Predict the category of the image."""
     image = preprocess_image(image_path)
     prediction = model.predict(image)
     print("Probabilities:", prediction)  # Debugging
@@ -48,22 +50,31 @@ def predict_image(image_path):
 def select_image():
     """Open file dialog to select an image."""
     Tk().withdraw()  # Hide the root window
-    file_path = filedialog.askopenfilename()
+    file_path = filedialog.askopenfilename(
+        filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.bmp;*.tiff;*.gif")]
+    )
     return file_path
-def main():
-    """Main function to run tkinter GUI."""
-    
 
 def main():
+    """Main function to run tkinter GUI."""
+
     def on_select_image():
+        """Handle image selection and preview."""
         nonlocal file_path
         file_path = select_image()
         if file_path:
             label_text.set("Image Selected")
-            img = PhotoImage(file=file_path)
-            canvas.image = img
-            canvas.create_image(0, 0, anchor="nw", image=img)
+            try:
+                # Load the image using Pillow
+                img = Image.open(file_path)
+                img = img.resize((200, 200))  # Resize the image to fit the canvas
+                img_tk = ImageTk.PhotoImage(img)  # Convert to PhotoImage for tkinter
 
+                # Display the image on the canvas
+                canvas.image = img_tk  # Keep a reference to avoid garbage collection
+                canvas.create_image(0, 0, anchor="nw", image=img_tk)
+            except Exception as e:
+                label_text.set(f"Error loading image: {e}")
     def on_classify():
         if file_path:
             result = predict_image(file_path)
@@ -82,8 +93,12 @@ def main():
 
     # Variables
     file_path = None
-    label_text = Label(root, text="Select an image to recognize a traffic sign")
-    label_text.pack()
+    label_text = StringVar()  # Use StringVar to manage label text
+    label_text.set("Select an image to recognize a traffic sign")  # Set initial text
+
+    # Label for instructions
+    label = Label(root, textvariable=label_text)  # Bind StringVar to Label
+    label.pack()
 
     # Canvas for displaying the image
     canvas = Canvas(root, width=200, height=200, bg="gray")
@@ -100,10 +115,12 @@ def main():
     reset_button.pack()
 
     # Result label
-    result_text = Label(root, text="")
-    result_text.pack()
+    result_text = StringVar()  # Use StringVar for result text
+    result_label = Label(root, textvariable=result_text)  # Bind StringVar to Label
+    result_label.pack()
 
     root.mainloop()
+
     """Main function to run pygame GUI."""
     """pygame.init()
     screen = pygame.display.set_mode((800, 400))
